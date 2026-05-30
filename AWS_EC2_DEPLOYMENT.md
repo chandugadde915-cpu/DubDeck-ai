@@ -302,6 +302,23 @@ temp/cache/
 
 Future runs should be faster as long as you keep the `temp/` folder.
 
+### Argos English-to-Hindi package is missing
+
+The Docker image installs the free Argos English-to-Hindi package during build. Pull the latest code and rebuild:
+
+```bash
+git pull
+docker compose build --no-cache
+docker compose up -d
+```
+
+To install it inside an already-running container without rebuilding:
+
+```bash
+docker exec -it dubdeck-ai python scripts/install_argos_en_hi.py
+docker compose restart
+```
+
 ### Disk fills up
 
 Video processing creates large WAV and MP4 files. Delete old files from:

@@ -31,6 +31,8 @@ RUN python -m pip install --upgrade pip setuptools wheel \
 
 COPY . .
 
+RUN python scripts/install_argos_en_hi.py
+
 RUN mkdir -p input output temp assets \
     temp/cache/torch \
     temp/cache/huggingface \
