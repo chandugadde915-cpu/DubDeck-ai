@@ -172,6 +172,9 @@ def separate_music_with_demucs(audio_path: Path, temp_dir: Path) -> tuple[Path, 
     env = os.environ.copy()
     env["TORCH_HOME"] = str(cache_dir / "torch")
     env["XDG_CACHE_HOME"] = str(cache_dir)
+    env["HF_HOME"] = str(cache_dir / "huggingface")
+    env["HUGGINGFACE_HUB_CACHE"] = str(cache_dir / "huggingface" / "hub")
+    env["TRANSFORMERS_CACHE"] = str(cache_dir / "huggingface" / "transformers")
     env["PYTHONPYCACHEPREFIX"] = str(cache_dir / "pycache")
     try:
         subprocess.run(command, check=True, capture_output=True, text=True, env=env)

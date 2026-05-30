@@ -23,6 +23,9 @@ ensure_folders(PROJECT_DIR)
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("TORCH_HOME", str(CACHE_DIR / "torch"))
 os.environ.setdefault("XDG_CACHE_HOME", str(CACHE_DIR))
+os.environ.setdefault("HF_HOME", str(CACHE_DIR / "huggingface"))
+os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(CACHE_DIR / "huggingface" / "hub"))
+os.environ.setdefault("TRANSFORMERS_CACHE", str(CACHE_DIR / "huggingface" / "transformers"))
 os.environ.setdefault("PYTHONPYCACHEPREFIX", str(CACHE_DIR / "pycache"))
 
 STEPS = [

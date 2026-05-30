@@ -236,3 +236,13 @@ vercel_landing/
 Deploy that folder to Vercel. Keep the main Streamlit processor local.
 
 To make the real processing cloud-hosted later, use a dedicated worker machine or container service with FFmpeg, model storage, and long job timeouts.
+
+## AWS EC2 Full Product Hosting
+
+To host the full product on AWS using local server folders only, use the Docker-based EC2 guide:
+
+```text
+AWS_EC2_DEPLOYMENT.md
+```
+
+This keeps uploaded videos, temporary files, caches, and output MP4 files in the EC2 project folders. It does not use S3.
