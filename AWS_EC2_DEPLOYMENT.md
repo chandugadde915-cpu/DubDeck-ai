@@ -160,6 +160,12 @@ Build and start:
 docker compose up -d --build
 ```
 
+Or use the helper script:
+
+```bash
+bash scripts/ec2_rebuild.sh
+```
+
 Open the app:
 
 ```text
@@ -236,6 +242,12 @@ This does not delete your local `input/`, `output/`, `temp/`, or `assets/` folde
 ```bash
 git pull
 docker compose up -d --build
+```
+
+Or:
+
+```bash
+bash scripts/ec2_rebuild.sh
 ```
 
 ## Common Problems

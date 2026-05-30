@@ -245,4 +245,10 @@ To host the full product on AWS using local server folders only, use the Docker-
 AWS_EC2_DEPLOYMENT.md
 ```
 
+AWS package details are listed in:
+
+```text
+AWS_PACKAGES.md
+```
+
 This keeps uploaded videos, temporary files, caches, and output MP4 files in the EC2 project folders. It does not use S3.
