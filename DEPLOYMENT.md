@@ -5,7 +5,9 @@ DubDeck AI has two parts:
 1. The local Streamlit video processor in the project root.
 2. The Vercel-ready public landing page in `vercel_landing/`.
 
-Deploy `vercel_landing/` to Vercel. Keep the Streamlit video processor local because it uses FFmpeg, faster-whisper, Demucs, and long-running laptop processing.
+The repository root now includes a Vercel-safe `index.html`, so Vercel can deploy the project even if you leave **Root Directory** as the repository root.
+
+Keep the Streamlit video processor local because it uses FFmpeg, faster-whisper, Demucs, and long-running laptop processing.
 
 ## Push To GitHub
 
@@ -30,12 +32,7 @@ Recommended Vercel dashboard steps:
 
 1. Go to Vercel.
 2. Import the GitHub repository.
-3. Set **Root Directory** to:
-
-```text
-vercel_landing
-```
-
+3. Leave **Root Directory** as the repository root, or set it to `vercel_landing`.
 4. Leave framework preset as **Other**.
 5. Deploy.
 
