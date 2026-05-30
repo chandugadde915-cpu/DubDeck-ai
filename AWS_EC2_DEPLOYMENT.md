@@ -326,6 +326,17 @@ Argos package data is stored in:
 temp/cache/data/
 ```
 
+### NumPy is not available
+
+This can happen if Torch is paired with NumPy 2.x. The Docker requirements pin `numpy<2`. Pull the latest code and rebuild:
+
+```bash
+git pull
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
 ### Disk fills up
 
 Video processing creates large WAV and MP4 files. Delete old files from:

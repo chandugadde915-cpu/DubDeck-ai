@@ -1,4 +1,5 @@
 streamlit
+numpy<2
 faster-whisper
 edge-tts
 argostranslate
