@@ -39,7 +39,11 @@ Storage:
 80-150 GB EBS volume
 ```
 
-Use Ubuntu 22.04 LTS or Ubuntu 24.04 LTS.
+Use Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, or Amazon Linux 2023.
+
+Avoid 2 GB RAM instances for real processing. They may fail during Docker builds or during Whisper/Demucs processing. Use at least 8 GB RAM for a smoother MVP.
+
+If you must test on a 2 GB RAM instance, add swap before building.
 
 ## Security Group
 
@@ -52,7 +56,44 @@ Streamlit: TCP 8501  from your IP or 0.0.0.0/0 for public testing
 
 For production, put Nginx and HTTPS in front later instead of exposing port 8501 directly.
 
-## Install Docker On EC2
+## Amazon Linux 2023 Quick Setup
+
+If your prompt looks like this, you are using Amazon Linux:
+
+```text
+[ec2-user@ip-... ~]$
+```
+
+Install Git:
+
+```bash
+sudo yum update -y
+sudo yum install -y git
+```
+
+Install Docker Compose plugin if `docker compose version` does not work:
+
+```bash
+mkdir -p ~/.docker/cli-plugins
+curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
+chmod +x ~/.docker/cli-plugins/docker-compose
+docker compose version
+```
+
+If the server has only about 2 GB RAM, add swap:
+
+```bash
+sudo fallocate -l 8G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+free -h
+```
+
+Then continue from **Clone DubDeck AI** below.
+
+## Ubuntu Docker Setup
 
 SSH into your EC2 server:
 
@@ -197,6 +238,31 @@ docker compose up -d --build
 ```
 
 ## Common Problems
+
+### Docker build fails during pip install
+
+Check memory:
+
+```bash
+free -h
+```
+
+If RAM is around 2 GB and swap is `0B`, add swap:
+
+```bash
+sudo fallocate -l 8G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+Then rebuild:
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
 
 ### App does not open
 
