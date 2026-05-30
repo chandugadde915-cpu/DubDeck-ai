@@ -1,0 +1,7 @@
+streamlit
+faster-whisper
+edge-tts
+argostranslate
+pydub
+moviepy
+demucs

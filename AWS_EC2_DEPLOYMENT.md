@@ -264,6 +264,16 @@ docker compose build --no-cache
 docker compose up -d
 ```
 
+If the error mentions `audioop-lts`, pull the latest code:
+
+```bash
+git pull
+docker compose build --no-cache
+docker compose up -d
+```
+
+The Docker image uses Python 3.11, which already includes `audioop`, so Docker installs from `requirements-docker.txt`.
+
 ### App does not open
 
 Check that the EC2 security group allows TCP port `8501`.

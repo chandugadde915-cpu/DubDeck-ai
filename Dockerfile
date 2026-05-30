@@ -24,10 +24,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements-docker.txt .
 RUN python -m pip install --upgrade pip setuptools wheel \
     && python -m pip install torch==2.2.2+cpu torchaudio==2.2.2+cpu --index-url https://download.pytorch.org/whl/cpu \
-    && python -m pip install -r requirements.txt
+    && python -m pip install -r requirements-docker.txt
 
 COPY . .
 
