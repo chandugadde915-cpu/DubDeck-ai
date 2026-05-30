@@ -87,6 +87,19 @@ def translate_with_glossary(text: str, glossary_path: Path) -> str:
     return restore_glossary_terms(translated, placeholders)
 
 
+def translate_segments_with_glossary(texts: list[str], glossary_path: Path) -> list[str]:
+    # Argos does not expose a true batch API here, so reuse one translation object
+    # and avoid repeated package/language discovery for every segment.
+    terms = load_glossary(glossary_path)
+    translation = _get_translation()
+    results: list[str] = []
+    for text in texts:
+        protected, placeholders = protect_glossary_terms(text, terms)
+        translated = translation.translate(protected) if protected.strip() else ""
+        results.append(restore_glossary_terms(translated, placeholders))
+    return results
+
+
 def install_argos_hint() -> str:
     return (
         "Open Python, install argostranslate, then install the English to Hindi package from Argos Translate. "

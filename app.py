@@ -45,6 +45,9 @@ STEPS = [
 
 def init_state() -> None:
     st.session_state.setdefault("statuses", {step: "Waiting" for step in STEPS})
+    st.session_state.setdefault("process_log", [])
+    st.session_state.setdefault("progress_percent", 0)
+    st.session_state.setdefault("segment_progress", "")
     st.session_state.setdefault("stage", "home")
     st.session_state.setdefault("mode", "")
     st.session_state.setdefault("input_video", None)
@@ -53,12 +56,22 @@ def init_state() -> None:
     st.session_state.setdefault("error", "")
 
 
-def set_status(step: str, status: str) -> None:
+def set_status(step: str, status: str, current: int | None = None, total: int | None = None, message: str = "") -> None:
     st.session_state.statuses[step] = status
+    if current and total:
+        st.session_state.progress_percent = max(0, min(100, int((current / total) * 100)))
+        st.session_state.segment_progress = f"{current}/{total}" if total > 7 else ""
+    if message:
+        st.session_state.process_log.append(message)
+    elif status in {"Running", "Completed", "Skipped", "Failed"}:
+        st.session_state.process_log.append(f"{step}: {status}")
 
 
 def reset_statuses() -> None:
     st.session_state.statuses = {step: "Waiting" for step in STEPS}
+    st.session_state.process_log = []
+    st.session_state.progress_percent = 0
+    st.session_state.segment_progress = ""
 
 
 def save_uploaded_file(uploaded_file, target_dir: Path) -> Path | None:
@@ -265,6 +278,8 @@ def header() -> None:
 
 def settings_panel() -> dict[str, object]:
     st.markdown("### Studio Settings")
+    st.selectbox("Source language", ["English"], disabled=True)
+    st.selectbox("Target language", ["Hindi India"], disabled=True)
     voice_choice = st.selectbox(
         "Hindi voice",
         ["Male: hi-IN-MadhurNeural", "Female: hi-IN-SwaraNeural"],
@@ -272,12 +287,26 @@ def settings_panel() -> dict[str, object]:
     speech_style = st.selectbox("Speech style", ["Natural", "Slow Training Voice", "Sync Optimized"])
     translation_mode = st.selectbox("Translation mode", ["Automatic", "Manual Review Recommended"])
     music_handling = st.selectbox(
-        "Music handling",
-        ["Keep original background music", "Remove background music", "Add new background music"],
+        "Background",
+        [
+            "Use music extracted from input video",
+            "Upload background music",
+            "Use original audio at low volume",
+            "No background music",
+        ],
     )
     bg_music = None
-    if music_handling == "Add new background music":
+    if music_handling == "Upload background music":
         bg_music = st.file_uploader("Upload background music", type=["mp3", "wav", "m4a"], key="bg_music")
+    strict_sync = st.toggle("Strict timestamp sync", value=True)
+    auto_speed_fit = st.toggle("Auto speed-fit Hindi voice", value=True)
+    voice_volume = st.slider("Hindi voice volume", 0, 150, 100)
+    background_volume = st.slider("Background music volume", 0, 100, 18)
+    fallback_volume = st.slider("Original fallback audio volume", 0, 50, 12)
+    transcription_model = st.selectbox("Transcription model", ["tiny", "small", "medium"], index=1)
+    enable_cache = st.toggle("Enable cache", value=True)
+    parallel_tts = st.toggle("Enable parallel TTS", value=False)
+    fast_export = st.toggle("Fast export mode", value=True)
     voice = "hi-IN-MadhurNeural" if voice_choice.startswith("Male") else "hi-IN-SwaraNeural"
     return {
         "voice": voice,
@@ -285,6 +314,15 @@ def settings_panel() -> dict[str, object]:
         "translation_mode": translation_mode,
         "music_handling": music_handling,
         "background_music": bg_music,
+        "strict_sync": strict_sync,
+        "auto_speed_fit": auto_speed_fit,
+        "voice_volume": voice_volume,
+        "background_volume": background_volume,
+        "fallback_volume": fallback_volume,
+        "transcription_model": transcription_model,
+        "enable_cache": enable_cache,
+        "parallel_tts": parallel_tts,
+        "fast_export": fast_export,
     }
 
 
@@ -319,12 +357,18 @@ def upload_panel() -> Path | None:
 
 def progress_panel() -> None:
     st.markdown("### Progress")
+    st.progress(st.session_state.progress_percent, text=f"{st.session_state.progress_percent}% complete")
+    if st.session_state.segment_progress:
+        st.caption(f"Segments completed: {st.session_state.segment_progress}")
     for step in STEPS:
         status = st.session_state.statuses.get(step, "Waiting")
         st.markdown(
             f"<div class='metric-line'><span>{step}</span>{status_badge(status)}</div>",
             unsafe_allow_html=True,
         )
+    if st.session_state.process_log:
+        st.markdown("### Live Process Log")
+        st.code("\n".join(st.session_state.process_log[-14:]), language="text")
 
 
 def handle_error(exc: Exception) -> None:
@@ -391,7 +435,14 @@ def home_screen() -> None:
             reset_statuses()
             st.session_state.mode = "pro"
             try:
-                prepared = pro_prepare(input_path, PROJECT_DIR, settings["music_handling"], set_status)
+                prepared = pro_prepare(
+                    input_path,
+                    PROJECT_DIR,
+                    settings["music_handling"],
+                    transcription_model=settings["transcription_model"],
+                    enable_cache=settings["enable_cache"],
+                    progress=set_status,
+                )
                 st.session_state.prepared = {
                     key: ([segment.__dict__ for segment in value] if key == "segments" else str(value))
                     for key, value in prepared.items()
@@ -457,7 +508,7 @@ def pro_review_screen() -> None:
         segments_to_rows(segments),
         use_container_width=True,
         height=440,
-        disabled=["Segment", "Start", "End", "English text", "Fit status"],
+        disabled=["Segment", "Start", "End", "English text", "Fit status", "Final duration"],
         column_config={"Hindi text": st.column_config.TextColumn(width="large")},
     )
 
@@ -482,9 +533,16 @@ def pro_review_screen() -> None:
                     PROJECT_DIR,
                     settings["voice"],
                     settings["music_handling"],
-                    bg_music_path,
-                    Path(prepared["music"]) if "music" in prepared else None,
-                    set_status,
+                    background_music_path=bg_music_path,
+                    separated_music_path=Path(prepared["music"]) if "music" in prepared else None,
+                    original_audio_path=Path(prepared["original_mix_audio"]) if "original_mix_audio" in prepared else None,
+                    voice_volume=settings["voice_volume"],
+                    background_volume=settings["background_volume"],
+                    fallback_volume=settings["fallback_volume"],
+                    auto_speed_fit=settings["auto_speed_fit"] and settings["strict_sync"],
+                    enable_cache=settings["enable_cache"],
+                    parallel_tts=settings["parallel_tts"],
+                    progress=set_status,
                 )
                 st.session_state.final_files = {key: str(value) for key, value in files.items()}
                 st.session_state.stage = "final"

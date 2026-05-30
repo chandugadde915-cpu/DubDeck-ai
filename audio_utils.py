@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -117,6 +118,27 @@ def extract_audio(video_path: Path, output_audio: Path) -> Path:
     return output_audio
 
 
+def extract_audio_for_mixing(video_path: Path, output_audio: Path) -> Path:
+    require_ffmpeg()
+    output_audio.parent.mkdir(parents=True, exist_ok=True)
+    run_command(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(video_path),
+            "-vn",
+            "-ac",
+            "2",
+            "-ar",
+            "44100",
+            str(output_audio),
+        ],
+        "High quality audio extraction failed.",
+    )
+    return output_audio
+
+
 def convert_audio(input_audio: Path, output_audio: Path) -> Path:
     require_ffmpeg()
     run_command(
@@ -195,14 +217,34 @@ def create_silence(duration_seconds: float) -> AudioSegment:
     return AudioSegment.silent(duration=int(duration_seconds * 1000), frame_rate=44100)
 
 
+def gain_from_percent(volume_percent: int | float) -> float:
+    percent = max(0.0, float(volume_percent))
+    if percent <= 0:
+        return -120.0
+    return 20 * math.log10(percent / 100.0)
+
+
+def normalize_audio(audio: AudioSegment, target_peak_dbfs: float = -1.0) -> AudioSegment:
+    if audio.max_dBFS == float("-inf"):
+        return audio
+    return audio.apply_gain(target_peak_dbfs - audio.max_dBFS)
+
+
 def mix_voice_with_music(
     voice_path: Path,
     music_path: Path | None,
     output_path: Path,
     voice_segments: list[tuple[float, float]],
     video_duration_seconds: float,
+    voice_volume: int | float = 100,
+    background_volume: int | float = 18,
 ) -> Path:
-    voice = AudioSegment.from_file(voice_path).set_frame_rate(44100).set_channels(2)
+    voice = (
+        AudioSegment.from_file(voice_path)
+        .set_frame_rate(44100)
+        .set_channels(2)
+        .apply_gain(gain_from_percent(voice_volume))
+    )
     base_duration_ms = int(video_duration_seconds * 1000)
 
     if music_path and music_path.exists():
@@ -210,17 +252,17 @@ def mix_voice_with_music(
         if len(music) < base_duration_ms:
             repeats = int(base_duration_ms / max(1, len(music))) + 1
             music = music * repeats
-        music = music[:base_duration_ms] - 22
+        music = music[:base_duration_ms].apply_gain(gain_from_percent(background_volume))
 
         for start, end in voice_segments:
             start_ms = max(0, int(start * 1000))
             end_ms = min(base_duration_ms, int(end * 1000))
             if end_ms <= start_ms:
                 continue
-            music = music[:start_ms] + (music[start_ms:end_ms] - 12) + music[end_ms:]
+            music = music[:start_ms] + (music[start_ms:end_ms] - 8) + music[end_ms:]
     else:
         music = create_silence(video_duration_seconds).set_channels(2)
 
-    mixed = music.overlay(voice)
+    mixed = normalize_audio(music.overlay(voice))
     mixed.export(output_path, format="wav")
     return output_path

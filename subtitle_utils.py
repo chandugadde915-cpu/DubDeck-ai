@@ -15,6 +15,9 @@ class Segment:
     fit_status: str = "Waiting"
     rate_used: str = ""
     problem: str = ""
+    generated_audio: str = ""
+    final_duration: float = 0.0
+    speed_ratio: float = 1.0
 
     @property
     def duration(self) -> float:
@@ -85,6 +88,40 @@ def segments_to_rows(segments: list[Segment]) -> list[dict[str, object]]:
             "English text": segment.english,
             "Hindi text": segment.hindi,
             "Fit status": segment.fit_status,
+            "Final duration": round(segment.final_duration, 2) if segment.final_duration else "",
         }
         for segment in segments
     ]
+
+
+def segment_to_dict(segment: Segment) -> dict[str, object]:
+    return {
+        "number": segment.number,
+        "start": segment.start,
+        "end": segment.end,
+        "duration": segment.duration,
+        "english": segment.english,
+        "hindi": segment.hindi,
+        "fit_status": segment.fit_status,
+        "rate_used": segment.rate_used,
+        "problem": segment.problem,
+        "generated_audio": segment.generated_audio,
+        "final_duration": segment.final_duration,
+        "speed_ratio": segment.speed_ratio,
+    }
+
+
+def dict_to_segment(data: dict[str, object]) -> Segment:
+    return Segment(
+        number=int(data["number"]),
+        start=float(data["start"]),
+        end=float(data["end"]),
+        english=str(data.get("english", "")),
+        hindi=str(data.get("hindi", "")),
+        fit_status=str(data.get("fit_status", "Waiting")),
+        rate_used=str(data.get("rate_used", "")),
+        problem=str(data.get("problem", "")),
+        generated_audio=str(data.get("generated_audio", "")),
+        final_duration=float(data.get("final_duration") or 0.0),
+        speed_ratio=float(data.get("speed_ratio") or 1.0),
+    )

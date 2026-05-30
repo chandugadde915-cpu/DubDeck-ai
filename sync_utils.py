@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import edge_tts
@@ -10,7 +11,8 @@ from audio_utils import audio_duration, create_silence
 from subtitle_utils import Segment, seconds_to_srt_time
 
 
-SYNC_RATES = ["-5%", "+0%", "+5%", "+10%", "+15%", "+20%"]
+SYNC_RATES = ["-10%", "-5%", "+0%", "+5%", "+10%"]
+MAX_SPEED_RATIO = 1.22
 
 
 class TTSError(RuntimeError):
@@ -31,6 +33,8 @@ async def _edge_tts_save(text: str, voice: str, rate: str, output_path: Path) ->
 
 
 def generate_tts(text: str, voice: str, rate: str, output_path: Path) -> Path:
+    if output_path.exists() and output_path.stat().st_size > 0:
+        return output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         asyncio.run(_edge_tts_save(text, voice, rate, output_path))
@@ -41,18 +45,82 @@ def generate_tts(text: str, voice: str, rate: str, output_path: Path) -> Path:
     return output_path
 
 
+def _speed_change(sound: AudioSegment, ratio: float) -> AudioSegment:
+    if ratio <= 1.01:
+        return sound
+    shifted = sound._spawn(sound.raw_data, overrides={"frame_rate": int(sound.frame_rate * ratio)})
+    return shifted.set_frame_rate(sound.frame_rate)
+
+
+def _fit_audio_to_segment(audio: AudioSegment, target_seconds: float) -> tuple[AudioSegment, float, str]:
+    target_ms = max(1, int(target_seconds * 1000))
+    duration_ms = len(audio)
+    if duration_ms <= target_ms:
+        return audio + AudioSegment.silent(duration=target_ms - duration_ms, frame_rate=audio.frame_rate), 1.0, "Perfect"
+
+    ratio = duration_ms / target_ms
+    if ratio <= MAX_SPEED_RATIO:
+        fitted = _speed_change(audio, ratio)
+        if len(fitted) > target_ms:
+            fitted = fitted[:target_ms]
+        else:
+            fitted += AudioSegment.silent(duration=target_ms - len(fitted), frame_rate=fitted.frame_rate)
+        return fitted, ratio, "Speed adjusted"
+
+    fitted = _speed_change(audio, MAX_SPEED_RATIO)
+    if len(fitted) > target_ms:
+        fitted = fitted[:target_ms]
+    else:
+        fitted += AudioSegment.silent(duration=target_ms - len(fitted), frame_rate=fitted.frame_rate)
+    return fitted, MAX_SPEED_RATIO, "Manual fix"
+
+
+def _generate_segment_candidate(segment: Segment, voice: str, temp_dir: Path) -> Path:
+    rate = "-5%"
+    output = temp_dir / f"segment_{segment.number:04}_{rate.replace('%', 'pct').replace('-', 'minus')}.mp3"
+    last_error: Exception | None = None
+    for _attempt in range(2):
+        try:
+            return generate_tts(segment.hindi.strip(), voice, rate, output)
+        except Exception as exc:
+            last_error = exc
+    raise TTSError(f"TTS failed for segment {segment.number}. Retrying did not recover. {last_error}")
+
+
 def place_segments_on_timeline(
     segments: list[Segment],
     video_duration_seconds: float,
     voice: str,
     temp_dir: Path,
     output_voice_path: Path,
+    auto_speed_fit: bool = True,
+    enable_cache: bool = True,
+    parallel_tts: bool = False,
+    progress=None,
 ) -> tuple[Path, list[Segment], list[Segment]]:
     timeline = create_silence(video_duration_seconds)
     manual_fix: list[Segment] = []
     temp_dir.mkdir(parents=True, exist_ok=True)
 
-    for segment in segments:
+    generated: dict[int, Path] = {}
+    tts_segments = [segment for segment in segments if segment.hindi.strip()]
+
+    if parallel_tts and tts_segments:
+        workers = min(4, len(tts_segments))
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(_generate_segment_candidate, segment, voice, temp_dir): segment for segment in tts_segments}
+            for done, future in enumerate(as_completed(futures), start=1):
+                segment = futures[future]
+                try:
+                    generated[segment.number] = future.result()
+                    if progress:
+                        progress("Generating Hindi voice", "Running", done, len(tts_segments), f"Generated TTS segment {done}/{len(tts_segments)}")
+                except Exception as exc:
+                    segment.fit_status = "Manual fix"
+                    segment.problem = f"TTS failed: {exc}"
+                    manual_fix.append(segment)
+
+    for index, segment in enumerate(segments, start=1):
         clean_text = segment.hindi.strip()
         if not clean_text:
             segment.fit_status = "Manual fix"
@@ -60,31 +128,36 @@ def place_segments_on_timeline(
             manual_fix.append(segment)
             continue
 
-        selected_audio: Path | None = None
-        selected_rate = ""
-        used_adjustment = False
-        for rate in SYNC_RATES:
-            candidate = temp_dir / f"segment_{segment.number:04}_{rate.replace('%', 'pct').replace('+', 'plus')}.mp3"
-            generate_tts(clean_text, voice, rate, candidate)
-            duration = audio_duration(candidate)
-            if duration <= segment.duration + 0.08:
-                selected_audio = candidate
-                selected_rate = rate
-                used_adjustment = rate not in ("-5%", "+0%")
-                break
-
+        selected_audio = generated.get(segment.number)
         if selected_audio is None:
-            segment.fit_status = "Manual fix"
-            segment.rate_used = "+20%"
-            segment.problem = "Hindi audio too long even at +20%"
-            manual_fix.append(segment)
-            selected_audio = candidate
-        else:
-            segment.fit_status = "Speed adjusted" if used_adjustment else "Perfect"
-            segment.rate_used = selected_rate
+            selected_audio = _generate_segment_candidate(segment, voice, temp_dir)
+            if progress:
+                progress("Generating Hindi voice", "Running", index, len(segments), f"Generated TTS segment {index}/{len(segments)}")
 
-        audio = AudioSegment.from_file(selected_audio)
-        timeline = timeline.overlay(audio, position=int(segment.start * 1000))
+        audio = AudioSegment.from_file(selected_audio).set_frame_rate(44100).set_channels(1)
+        if auto_speed_fit:
+            fitted, ratio, status = _fit_audio_to_segment(audio, segment.duration)
+        else:
+            target_ms = max(1, int(segment.duration * 1000))
+            fitted = audio[:target_ms] if len(audio) > target_ms else audio + AudioSegment.silent(duration=target_ms - len(audio), frame_rate=audio.frame_rate)
+            ratio = 1.0
+            status = "Manual fix" if len(audio) > target_ms else "Perfect"
+
+        fitted_path = temp_dir / f"segment_{segment.number:04}_fitted.wav"
+        fitted.export(fitted_path, format="wav")
+        segment.generated_audio = str(fitted_path)
+        segment.final_duration = len(fitted) / 1000
+        segment.speed_ratio = round(ratio, 3)
+        segment.rate_used = f"{ratio:.2f}x"
+        segment.fit_status = status
+        if status == "Speed adjusted":
+            segment.problem = "Hindi segment exceeded original duration. Speed adjusted."
+        elif status == "Manual fix":
+            segment.problem = "Hindi audio too long; fitted with max safe speed and trimmed."
+            if segment not in manual_fix:
+                manual_fix.append(segment)
+
+        timeline = timeline.overlay(fitted, position=int(segment.start * 1000))
 
     timeline.export(output_voice_path, format="wav")
     return output_voice_path, segments, manual_fix
