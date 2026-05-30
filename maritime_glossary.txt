@@ -1,0 +1,32 @@
+vessel
+ship
+crew
+master
+chief officer
+officer
+inspector
+observation
+deficiency
+SIRE
+PSC
+CDI
+ISGOTT
+SOLAS
+MARPOL
+SMS
+permit to work
+enclosed space
+mooring
+cargo operation
+ballast
+bridge
+engine room
+safety management system
+risk assessment
+toolbox talk
+near miss
+non-conformity
+inspection
+audit
+drill
+emergency response

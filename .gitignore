@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+temp/*
+output/*
+input/*.mp4
+assets/*.mp3
+assets/*.wav
+assets/*.m4a
+!temp/temporary_files_will_appear_here.txt
+!output/output_files_will_appear_here.txt
+!input/put_input_video_here.txt
+!assets/optional_background_music_here.txt
