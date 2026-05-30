@@ -172,6 +172,7 @@ def separate_music_with_demucs(audio_path: Path, temp_dir: Path) -> tuple[Path, 
     env = os.environ.copy()
     env["TORCH_HOME"] = str(cache_dir / "torch")
     env["XDG_CACHE_HOME"] = str(cache_dir)
+    env["XDG_DATA_HOME"] = str(cache_dir / "data")
     env["HF_HOME"] = str(cache_dir / "huggingface")
     env["HUGGINGFACE_HUB_CACHE"] = str(cache_dir / "huggingface" / "hub")
     env["TRANSFORMERS_CACHE"] = str(cache_dir / "huggingface" / "transformers")

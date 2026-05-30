@@ -191,6 +191,7 @@ Model and tool caches:
 ```text
 temp/cache/
 temp/cache/torch/
+temp/cache/data/
 temp/cache/huggingface/
 ```
 
@@ -317,6 +318,12 @@ To install it inside an already-running container without rebuilding:
 ```bash
 docker exec -it dubdeck-ai python scripts/install_argos_en_hi.py
 docker compose restart
+```
+
+Argos package data is stored in:
+
+```text
+temp/cache/data/
 ```
 
 ### Disk fills up

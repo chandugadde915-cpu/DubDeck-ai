@@ -1,6 +1,15 @@
 from __future__ import annotations
 
+import os
 import sys
+from pathlib import Path
+
+
+PROJECT_DIR = Path(__file__).resolve().parents[1]
+CACHE_DIR = PROJECT_DIR / "temp" / "cache"
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("XDG_CACHE_HOME", str(CACHE_DIR))
+os.environ.setdefault("XDG_DATA_HOME", str(CACHE_DIR / "data"))
 
 import argostranslate.package
 import argostranslate.translate

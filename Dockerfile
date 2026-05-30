@@ -8,6 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     STREAMLIT_SERVER_PORT=8501 \
     TORCH_HOME=/app/temp/cache/torch \
     XDG_CACHE_HOME=/app/temp/cache \
+    XDG_DATA_HOME=/app/temp/cache/data \
     HF_HOME=/app/temp/cache/huggingface \
     HUGGINGFACE_HUB_CACHE=/app/temp/cache/huggingface/hub \
     TRANSFORMERS_CACHE=/app/temp/cache/huggingface/transformers \
@@ -35,6 +36,7 @@ RUN python scripts/install_argos_en_hi.py
 
 RUN mkdir -p input output temp assets \
     temp/cache/torch \
+    temp/cache/data \
     temp/cache/huggingface \
     temp/cache/pycache \
     && chmod -R 777 input output temp assets
