@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  DRAFT
+  UPLOADED
+  PROCESSING
+  REVIEW_REQUIRED
+  COMPLETED
+  FAILED
+}
+
+enum AssetType {
+  SOURCE_VIDEO
+  EXTRACTED_AUDIO
+  TRANSCRIPT_JSON
+  TRANSLATED_JSON
+  TTS_SEGMENT
+  SYNCED_AUDIO
+  SUBTITLE_SRT
+  SUBTITLE_VTT
+  QA_REPORT
+  FINAL_VIDEO
+}
+
+enum SegmentFitStatus {
+  FITS
+  REWRITTEN
+  NEEDS_REVIEW
+  FAILED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  projects  Project[]
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+}
+
+model Project {
+  id             String        @id @default(cuid())
+  ownerId        String
+  owner          User          @relation(fields: [ownerId], references: [id])
+  title          String
+  sourceLanguage String
+  targetLanguage String
+  voiceId        String?
+  status         ProjectStatus @default(DRAFT)
+  durationMs     Int?
+  progress       Int           @default(0)
+  currentStep    String?
+  errorMessage   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  assets         MediaAsset[]
+  segments       TranscriptSegment[]
+  jobs           ProcessingJob[]
+  qaReports      QaReport[]
+}
+
+model MediaAsset {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id])
+  type      AssetType
+  key       String
+  bucket    String
+  mimeType  String?
+  sizeBytes BigInt?
+  createdAt DateTime  @default(now())
+}
+
+model TranscriptSegment {
+  id                String           @id @default(cuid())
+  projectId          String
+  project            Project          @relation(fields: [projectId], references: [id])
+  index              Int
+  startMs            Int
+  endMs              Int
+  sourceText         String
+  translatedText     String?
+  optimizedText      String?
+  estimatedSpeechMs  Int?
+  actualSpeechMs     Int?
+  fitStatus          SegmentFitStatus @default(FITS)
+  ttsAssetKey        String?
+  warning            String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([projectId, index])
+}
+
+model ProcessingJob {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  queueJobId  String?
+  step        String
+  status      String
+  attempts    Int      @default(0)
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model QaReport {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  passed    Boolean
+  score     Int
+  findings  Json
+  createdAt DateTime @default(now())
+}
+

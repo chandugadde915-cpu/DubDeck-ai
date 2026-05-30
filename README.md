@@ -252,3 +252,13 @@ AWS_PACKAGES.md
 ```
 
 This keeps uploaded videos, temporary files, caches, and output MP4 files in the EC2 project folders. It does not use S3.
+
+## SaaS Platform Track
+
+The production SaaS monorepo starter is in:
+
+```text
+saas-platform/
+```
+
+It contains a Next.js dashboard, NestJS API, BullMQ worker, PostgreSQL schema, Redis queue design, FFmpeg worker boundaries, OpenAI API service boundaries, and S3/R2 storage architecture.

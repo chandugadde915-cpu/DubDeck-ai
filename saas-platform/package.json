@@ -1,0 +1,21 @@
+{
+  "name": "dubdeck-ai-saas",
+  "private": true,
+  "packageManager": "npm@11.12.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm --workspace packages/db run generate",
+    "db:migrate": "npm --workspace packages/db run migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
+
